@@ -1,0 +1,8 @@
+<component name="ArtifactManager">
+  <artifact type="jar" build-on-make="true" name="PotatoAPI:jar">
+    <output-path>$USER_HOME$/Desktop</output-path>
+    <root id="archive" name="PotatoAPI.jar">
+      <element id="module-output" name="PotatoAPI" />
+    </root>
+  </artifact>
+</component>
