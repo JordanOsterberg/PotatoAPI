@@ -2,14 +2,9 @@ package me.potato.api;
 
 import com.google.common.io.ByteArrayDataOutput;
 import com.google.common.io.ByteStreams;
-import net.minecraft.server.v1_8_R3.IChatBaseComponent;
-import net.minecraft.server.v1_8_R3.PacketPlayOutChat;
-import net.minecraft.server.v1_8_R3.PacketPlayOutTitle;
-import net.minecraft.server.v1_8_R3.PlayerConnection;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.Material;
-import org.bukkit.craftbukkit.v1_8_R3.entity.CraftPlayer;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
@@ -18,6 +13,7 @@ import org.bukkit.plugin.java.JavaPlugin;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
+import java.lang.reflect.Constructor;
 import java.net.Socket;
 
 public class PotatoAPI extends JavaPlugin {
@@ -64,24 +60,65 @@ public class PotatoAPI extends JavaPlugin {
     // Action bar
 
     public void sendActionBar(Player p, String message) {
-        IChatBaseComponent cbc = IChatBaseComponent.ChatSerializer.a("{\"text\": \"" + message + "\"}");
-        PacketPlayOutChat ppac = new PacketPlayOutChat(cbc, (byte) 2);
-        ((CraftPlayer) p).getHandle().playerConnection.sendPacket(ppac);
+        message = format(message);
+
+        try {
+            Object iChatBaseComponent = getNMSClass("IChatBaseComponent").getDeclaredClasses()[0].getMethod("a", String.class).invoke(null, "{\"text\": \"" + message + "\"}");
+            Constructor<?> packetConstructor = getNMSClass("PacketPlayOutChat").getConstructor(getNMSClass("IChatBaseComponent"), byte.class);
+            Object packet = packetConstructor.newInstance(iChatBaseComponent, (byte) 2);
+            sendPacket(p, packet);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 
     // Title
-
     public void sendTitle(Player p, String title, String subTitle, int fadeIn, int stay, int fadeOut) {
-        CraftPlayer craftPlayer = (CraftPlayer) p;
-        PlayerConnection connection = craftPlayer.getHandle().playerConnection;
-        IChatBaseComponent titleJSON = IChatBaseComponent.ChatSerializer.a("{'text':  '" + title + "'}");
-        IChatBaseComponent subtitleJSON = IChatBaseComponent.ChatSerializer.a("{'text':  '" + subTitle + "'}");
-        PacketPlayOutTitle titlePacket = new PacketPlayOutTitle(PacketPlayOutTitle.EnumTitleAction.TITLE, titleJSON, fadeIn, stay, fadeOut);
-        PacketPlayOutTitle subtitlePacket = new PacketPlayOutTitle(PacketPlayOutTitle.EnumTitleAction.SUBTITLE, subtitleJSON, fadeIn, stay, fadeOut);
-        connection.sendPacket(titlePacket);
-        connection.sendPacket(subtitlePacket);
+        title = format(title);
+        subTitle = format(subTitle);
+
+        try {
+            Object enumTitle = getNMSClass("PacketPlayOutTitle").getDeclaredClasses()[0].getField("TITLE").get(null);
+            Object enumSubTitle = getNMSClass("PacketPlayOutTitle").getDeclaredClasses()[0].getField("SUBTITLE").get(null);
+
+            Object titleChatComponent = getNMSClass("IChatBaseComponent").getDeclaredClasses()[0].getMethod("a", String.class).invoke(null, "{\"text\":\""  + title + "\"}");
+            Object subTitleChatComponent = getNMSClass("IChatBaseComponent").getDeclaredClasses()[0].getMethod("a", String.class).invoke(null, "{\"text\":\""  + subTitle + "\"}");
+
+            Constructor<?> titleConstructor = getNMSClass("PacketPlayOutTitle").getConstructor(getNMSClass("PacketPlayOutTitle").getDeclaredClasses()[0], getNMSClass("IChatBaseComponent"), int.class, int.class, int.class);
+
+            Object titlePacket = titleConstructor.newInstance(enumTitle, titleChatComponent, fadeIn, stay, fadeOut);
+            sendPacket(p, titlePacket);
+
+            Object subTitlePacket = titleConstructor.newInstance(enumSubTitle, subTitleChatComponent, fadeIn, stay, fadeOut);
+            sendPacket(p, subTitlePacket);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 
+    // NMS send packet
+    private void sendPacket(Player player, Object packet) {
+        try {
+            Object handle = player.getClass().getMethod("getHandle").invoke(player);
+            Object playerConnection = handle.getClass().getField("playerConnection").get(handle);
+            playerConnection.getClass().getMethod("sendPacket", getNMSClass("Packet")).invoke(playerConnection, packet);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    // NMS class fetcher
+    public Class<?> getNMSClass(String name) {
+        String version = Bukkit.getServer().getClass().getPackage().getName().split("\\.")[3];
+        try {
+            return Class.forName("net.minecraft.server." + version + "." + name);
+        } catch (ClassNotFoundException e) {
+            e.printStackTrace();
+            return null;
+        }
+    }
+
+    // Socket MOTD fetching
     public String getMOTD(String ip, int port) {
         try (Socket sock = new Socket(ip, port);
              DataOutputStream out = new DataOutputStream(sock.getOutputStream());

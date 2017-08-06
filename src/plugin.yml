@@ -1,4 +1,4 @@
 name: PotatoAPI
 version: 1.0
 main: me.potato.api.PotatoAPI
-author: Skinlesspotato
+authors: [Skinlesspotato, JordanOsterberg]
