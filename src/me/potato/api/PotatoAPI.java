@@ -53,7 +53,7 @@ public class PotatoAPI extends JavaPlugin {
 
     // Clear chat
 
-    public void clearCha() {
+    public void clearChat() {
         for (Player player : Bukkit.getOnlinePlayers()) {
             for(int i=0; i < 100; i++) {
                 player.sendMessage("");
